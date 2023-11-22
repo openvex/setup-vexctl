@@ -1,0 +1,148 @@
+#
+# Copyright 2023 The OpenVEX Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+name: setup-vexctl
+author: The OpenVEX Authors
+description: 'Installs vexctl and includes it in your path'
+branding:
+  icon: 'package'
+  color: 'blue'
+# This is pinned to the last major release, we have to bump it for each action version.
+inputs:
+  vexctl-release:
+    description: 'vexctl release version to be installed'
+    required: false
+    default: '0.2.5'
+  install-dir:
+    description: 'Where to install the vexctl binary'
+    required: false
+    default: '$HOME/.vexctl'
+  use-sudo:
+    description: 'set to true if install-dir location requires sudo privs'
+    required: false
+    default: 'false'
+runs:
+  using: "composite"
+  steps:
+    - uses: sigstore/cosign-installer@1fc5bd396d372bee37d608f955b336615edf79c8 # v3.2.0
+      with:
+        install-dir: ${{ inputs.install-dir }}
+        use-sudo: ${{ inputs.use-sudo }}
+    - shell: bash
+      run: |
+        #!/bin/bash
+        # vexctl install script
+        shopt -s expand_aliases
+        if [ -z "$NO_COLOR" ]; then
+          alias log_info="echo -e \"\033[1;32mINFO\033[0m:\""
+          alias log_error="echo -e \"\033[1;31mERROR\033[0m:\""
+        else
+          alias log_info="echo \"INFO:\""
+          alias log_error="echo \"ERROR:\""
+        fi
+        set -e
+
+        mkdir -p ${{ inputs.install-dir }}
+
+        trap "popd >/dev/null" EXIT
+
+        pushd ${{ inputs.install-dir }} > /dev/null
+        vexctl_executable_name='vexctl'
+        case ${{ runner.os }} in
+          Linux)
+            case ${{ runner.arch }} in
+              X64)
+                desired_vexctl_filename='vexctl-linux-amd64'
+                ;;
+
+              ARM)
+                desired_vexctl_filename='vexctl-linux-arm'
+                ;;
+
+              ARM64)
+                desired_vexctl_filename='vexctl-linux-arm64'
+                ;;
+
+              *)
+                log_error "unsupported architecture $arch"
+                exit 1
+                ;;
+            esac
+            ;;
+
+          macOS)
+            case ${{ runner.arch }} in
+              X64)
+                desired_vexctl_filename='vexctl-darwin-amd64'
+                ;;
+
+              ARM64)
+                desired_vexctl_filename='vexctl-darwin-arm64'
+                ;;
+
+              *)
+                log_error "unsupported architecture $arch"
+                exit 1
+                ;;
+            esac
+            ;;
+
+          Windows)
+            case ${{ runner.arch }} in
+              X64)
+                desired_vexctl_filename='vexctl-windows-amd64.exe'
+                vexctl_executable_name=vexctl.exe
+                ;;
+              *)
+                log_error "unsupported architecture $arch"
+                exit 1
+                ;;
+            esac
+            ;;
+          *)
+            log_error "unsupported architecture $arch"
+            exit 1
+            ;;
+        esac
+
+        SUDO=
+        if "${{ inputs.use-sudo }}" == "true" && command -v sudo >/dev/null; then
+          SUDO=sudo
+        fi
+
+        semver='^([0-9]+\.){0,2}(\*|[0-9]+)$'
+        if [[ ${{ inputs.vexctl-release }} =~ $semver ]]; then
+          log_info "Custom vexctl version '${{ inputs.vexctl-release }}' requested"
+        else
+          log_error "Unable to validate requested vexctl version: '${{ inputs.vexctl-release }}'"
+          exit 1
+        fi
+
+        # Download custom vexctl
+        log_info "Downloading platform-specific version '${{ inputs.vexctl-release }}' of vexctl...\n      https://github.com/openvex/vexctl/releases/download/v${{ inputs.vexctl-release }}/${desired_vexctl_filename}"
+        $SUDO curl -sL https://github.com/openvex/vexctl/releases/download/v${{ inputs.vexctl-release }}/${desired_vexctl_filename} -o ${vexctl_executable_name}
+
+        VEXCTL_CERT=https://github.com/openvex/vexctl/releases/download/v${{ inputs.vexctl-release }}/${desired_vexctl_filename}.pem
+        VEXCTL_SIG=https://github.com/openvex/vexctl/releases/download/v${{ inputs.vexctl-release }}/${desired_vexctl_filename}.sig
+
+        log_info "Using cosign to verify signature of desired vexctl version"
+        cosign verify-blob --certificate $VEXCTL_CERT --signature $VEXCTL_SIG \
+          --certificate-identity "https://github.com/openvex/vexctl/.github/workflows/release.yaml@refs/tags/v${{ inputs.vexctl-release }}" \
+          --certificate-oidc-issuer "https://token.actions.githubusercontent.com" ${vexctl_executable_name}
+        retVal=$?
+        if [[ $retVal -eq 0 ]]; then
+          $SUDO chmod +x ${vexctl_executable_name}
+          log_info "Installation complete!"
+        else
+          log_error "Unable to validate vexctl version: '${{ inputs.vexctl-release }}'"
+          exit 1
+        fi
+
+    - if: ${{ runner.os == 'Linux' || runner.os == 'macOS' }}
+      run: echo "${{ inputs.install-dir }}" >> $GITHUB_PATH
+      shell: bash
+    - if: ${{ runner.os == 'Windows' }}
+      run: echo "${{ inputs.install-dir }}" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      shell: pwsh
