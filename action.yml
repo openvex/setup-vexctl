@@ -14,7 +14,7 @@ inputs:
   vexctl-release:
     description: 'vexctl release version to be installed'
     required: false
-    default: '0.2.5'
+    default: '0.2.6'
   install-dir:
     description: 'Where to install the vexctl binary'
     required: false
