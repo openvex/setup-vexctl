@@ -11,7 +11,7 @@ Add the following entry to your Github workflow YAML file:
 ```yaml
 uses: openvex/setup-vexctl@main
 with:
-  vexctl-release: '0.2.5' # optional
+  vexctl-release: '0.3.0' # optional
 ```
 
 Example using a pinned version:
@@ -28,7 +28,7 @@ jobs:
       - name: Install vexctl
         uses: openvex/setup-vexctl@main
         with:
-          vexctl-release: '0.2.5' # optional
+          vexctl-release: '0.3.0' # optional
       - name: Check install!
         run: vexctl version
 ```
