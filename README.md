@@ -57,5 +57,6 @@ The following optional inputs:
 | Input | Description |
 | --- | --- |
 | `vexctl-release` | `vexctl` version to use instead of the default. |
+| `cosign-release` | `cosign` version to use instead of the default. |
 | `install-dir` | directory to place the `vexctl` binary into instead of the default (`$HOME/.vexctl`). |
 | `use-sudo` | set to `true` if `install-dir` location requires sudo privs. Defaults to false. |
