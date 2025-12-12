@@ -121,9 +121,16 @@ jobs:
       - name: Install vexctl
         uses: ./
         with:
-          cosign-relase: v2.6.1
-      - name: Check install!
+          cosign-release: v2.6.1
+      - name: Check vexctl install!
         run: vexctl version
+      - name: Check cosign install!
+        run: |-
+          if [ "$(cosign version --json | jq -r .gitVersion)" != 'v2.6.1' ]; then
+            echo 'unexpected cosign version'
+            exit 1
+          fi
+
       - name: Check root directory
         run: |
           if [[ $(git diff --stat) != '' ]]; then
