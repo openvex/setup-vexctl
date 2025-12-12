@@ -126,10 +126,11 @@ jobs:
         run: vexctl version
       - name: Check cosign install!
         run: |-
-          if [ "$(cosign version --json | jq -r .gitVersion)" != 'v2.6.1' ]; then
+          if [[ "$(cosign version --json | jq -r .gitVersion)" != 'v2.6.1' ]]; then
             echo 'unexpected cosign version'
             exit 1
           fi
+        shell: bash
 
       - name: Check root directory
         run: |
