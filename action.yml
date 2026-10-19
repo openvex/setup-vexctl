@@ -131,11 +131,20 @@ runs:
 
         VEXCTL_CERT=https://github.com/openvex/vexctl/releases/download/v${{ inputs.vexctl-release }}/${desired_vexctl_filename}.pem
         VEXCTL_SIG=https://github.com/openvex/vexctl/releases/download/v${{ inputs.vexctl-release }}/${desired_vexctl_filename}.sig
-
-        log_info "Using cosign to verify signature of desired vexctl version"
-        cosign verify-blob --certificate $VEXCTL_CERT --signature $VEXCTL_SIG \
-          --certificate-identity "https://github.com/openvex/vexctl/.github/workflows/release.yaml@refs/tags/v${{ inputs.vexctl-release }}" \
-          --certificate-oidc-issuer "https://token.actions.githubusercontent.com" ${vexctl_executable_name}
+        VEXCTL_SIGSTORE=https://github.com/openvex/vexctl/releases/download/v${{ inputs.vexctl-release }}/${desired_vexctl_filename}.sigstore.json
+        
+        log_info "Using cosign to verify signature of desired vexctl version. Using signature bundle at $VEXCTL_SIGSTORE"
+        if curl --fail --location --silent --output sigstore.json "$VEXCTL_SIGSTORE" ; then        
+          cosign verify-blob --bundle sigstore.json \
+            --certificate-identity "https://github.com/openvex/vexctl/.github/workflows/release.yaml@refs/tags/v${{ inputs.vexctl-release }}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" ${vexctl_executable_name}
+        else
+          log_info "No signature bundle found, falling back to verifying vexctl binary with certificate ($VEXCTL_CERT) and signature ($VEXCTL_SIG)"
+          cosign verify-blob --certificate $VEXCTL_CERT --signature $VEXCTL_SIG \
+            --certificate-identity "https://github.com/openvex/vexctl/.github/workflows/release.yaml@refs/tags/v${{ inputs.vexctl-release }}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" ${vexctl_executable_name}
+        fi
+        
         retVal=$?
         if [[ $retVal -eq 0 ]]; then
           $SUDO chmod +x ${vexctl_executable_name}
